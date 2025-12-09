@@ -1,60 +1,158 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ESP32-CAM RC - Live</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ESP32-CAM RC</title>
+
 <style>
-  body{background:#111;color:#e6ffee;font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;padding:10px;}
-  h1{margin:6px}
-  #video{width:95%;max-width:720px;border:3px solid #0ff;border-radius:8px}
-  .controls{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
-  .row{display:flex;gap:8px;justify-content:center}
-  button{padding:12px 18px;font-size:18px;border-radius:8px;border:none;background:#0ff;color:#000;cursor:pointer;user-select:none;}
-  button:active{transform:translateY(1px)}
+  body {
+    margin: 0;
+    padding: 0;
+    background: #0d0d0f;
+    font-family: Arial, sans-serif;
+    color: #eaffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    padding: 15px;
+    font-size: 24px;
+    font-weight: bold;
+    color: #00f6ff;
+    text-shadow: 0 0 10px #00e2ff;
+  }
+
+  #videoBox {
+    width: 95%;
+    max-width: 720px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 10px;
+    box-shadow: 0 0 25px rgba(0,255,255,0.3);
+  }
+
+  #video {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+    display: block;
+  }
+
+  /* CONTROL BUTTONS */
+  .controls {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .row {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+  }
+
+  button {
+    width: 80px;
+    height: 80px;
+    font-size: 24px;
+    border-radius: 16px;
+    border: none;
+    cursor: pointer;
+    background: #00f6ff;
+    color: #002426;
+    font-weight: bold;
+    box-shadow: 0 0 15px rgba(0,255,255,0.5);
+    transition: 0.1s;
+  }
+
+  button:active {
+    transform: scale(0.92);
+    box-shadow: 0 0 25px rgba(0,255,255,0.9);
+  }
+
+  #stop {
+    width: 100px;
+    background: #ff3860;
+    color: white;
+    box-shadow: 0 0 15px rgba(255,80,110,0.7);
+  }
+
+  #stop:active {
+    box-shadow: 0 0 25px rgba(255,80,110,1);
+  }
+
 </style>
 </head>
 <body>
-  <h1>ESP32-CAM RC — Live</h1>
-  <img id="video" src="/stream" alt="live stream" />
-  <div class="controls">
-    <div class="row"><button id="up">⬆ MAJU</button></div>
-    <div class="row">
-      <button id="left">⬅ KIRI</button>
-      <button id="stop">⏹ STOP</button>
-      <button id="right">➡ KANAN</button>
-    </div>
-    <div class="row"><button id="down">⬇ MUNDUR</button></div>
+
+<header>🚗 ESP32-CAM RC — Live Stream</header>
+
+<div id="videoBox">
+  <img id="video" src="/stream" alt="Camera Stream" />
+</div>
+
+<div class="controls">
+
+  <div class="row">
+    <button id="up">⬆</button>
   </div>
+
+  <div class="row">
+    <button id="left">⬅</button>
+    <button id="stop">⏹</button>
+    <button id="right">➡</button>
+  </div>
+
+  <div class="row">
+    <button id="down">⬇</button>
+  </div>
+
+</div>
 
 <script>
 const sendCmd = (cmd) => {
   fetch('/control', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({cmd})
-  }).catch(e => console.log('ctrl err', e));
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cmd })
+  });
 };
 
-// press & hold logic (mouse & touch)
-const bindHold = (el, cmd) => {
-  let hold = false;
-  const start = (e) => { hold = true; sendCmd(cmd); e.preventDefault(); };
-  const end = (e) => { if(hold){ sendCmd('stop'); hold=false; } e.preventDefault(); };
+const bindHold = (element, cmd) => {
+  let pressed = false;
 
-  el.addEventListener('mousedown', start);
-  el.addEventListener('touchstart', start);
-  el.addEventListener('mouseup', end);
-  el.addEventListener('mouseleave', end);
-  el.addEventListener('touchend', end);
-  el.addEventListener('touchcancel', end);
+  const pressStart = (e) => {
+    pressed = true;
+    sendCmd(cmd);
+    e.preventDefault();
+  };
+
+  const pressEnd = (e) => {
+    if (pressed) sendCmd("stop");
+    pressed = false;
+    e.preventDefault();
+  };
+
+  element.addEventListener("mousedown", pressStart);
+  element.addEventListener("touchstart", pressStart);
+
+  element.addEventListener("mouseup", pressEnd);
+  element.addEventListener("mouseleave", pressEnd);
+  element.addEventListener("touchend", pressEnd);
+  element.addEventListener("touchcancel", pressEnd);
 };
 
-bindHold(document.getElementById('up'), 'forward');
-bindHold(document.getElementById('down'), 'backward');
-bindHold(document.getElementById('left'), 'left');
-bindHold(document.getElementById('right'), 'right');
-document.getElementById('stop').addEventListener('click', ()=>sendCmd('stop'));
+bindHold(document.getElementById("up"), "forward");
+bindHold(document.getElementById("down"), "backward");
+bindHold(document.getElementById("left"), "left");
+bindHold(document.getElementById("right"), "right");
+
+document.getElementById("stop").onclick = () => sendCmd("stop");
 </script>
+
 </body>
 </html>
