@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ESP32-CAM RC - Live</title>
+<style>
+  body{background:#111;color:#e6ffee;font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;padding:10px;}
+  h1{margin:6px}
+  #video{width:95%;max-width:720px;border:3px solid #0ff;border-radius:8px}
+  .controls{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+  .row{display:flex;gap:8px;justify-content:center}
+  button{padding:12px 18px;font-size:18px;border-radius:8px;border:none;background:#0ff;color:#000;cursor:pointer;user-select:none;}
+  button:active{transform:translateY(1px)}
+</style>
+</head>
+<body>
+  <h1>ESP32-CAM RC — Live</h1>
+  <img id="video" src="/stream" alt="live stream" />
+  <div class="controls">
+    <div class="row"><button id="up">⬆ MAJU</button></div>
+    <div class="row">
+      <button id="left">⬅ KIRI</button>
+      <button id="stop">⏹ STOP</button>
+      <button id="right">➡ KANAN</button>
+    </div>
+    <div class="row"><button id="down">⬇ MUNDUR</button></div>
+  </div>
+
+<script>
+const sendCmd = (cmd) => {
+  fetch('/control', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({cmd})
+  }).catch(e => console.log('ctrl err', e));
+};
+
+// press & hold logic (mouse & touch)
+const bindHold = (el, cmd) => {
+  let hold = false;
+  const start = (e) => { hold = true; sendCmd(cmd); e.preventDefault(); };
+  const end = (e) => { if(hold){ sendCmd('stop'); hold=false; } e.preventDefault(); };
+
+  el.addEventListener('mousedown', start);
+  el.addEventListener('touchstart', start);
+  el.addEventListener('mouseup', end);
+  el.addEventListener('mouseleave', end);
+  el.addEventListener('touchend', end);
+  el.addEventListener('touchcancel', end);
+};
+
+bindHold(document.getElementById('up'), 'forward');
+bindHold(document.getElementById('down'), 'backward');
+bindHold(document.getElementById('left'), 'left');
+bindHold(document.getElementById('right'), 'right');
+document.getElementById('stop').addEventListener('click', ()=>sendCmd('stop'));
+</script>
+</body>
+</html>
