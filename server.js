@@ -1,40 +1,37 @@
-// super low latency esp32 stream server
 const express = require("express");
 const app = express();
 
-// IMPORTANT: untuk RAW JPEG dari ESP32
-app.use(express.raw({ type: "image/jpeg", limit: "5mb" }));
+// RAW hanya untuk endpoint /frame (lebih aman, tidak makan RAM seluruh server)
+app.post("/frame", express.raw({
+    type: "image/jpeg",
+    limit: "2mb"
+}), (req, res) => {
 
-// UI & command tetap JSON
-app.use(express.json({ limit: "1mb" }));
-
-let latestFrame = null;      // JPEG buffer (raw)
-let lastFrameTime = Date.now();
-
-let lastCommand = "stop";
-let lastCmdTime = Date.now();
-
-// --- menerima frame RAW JPEG ---
-app.post("/frame", (req, res) => {
-    if (!req.body || req.body.length < 10) {
+    if (!req.body || req.body.length < 20) {
         return res.status(400).send("no raw");
     }
 
-    latestFrame = Buffer.from(req.body); // langsung simpan JPEG
+    latestFrame = Buffer.from(req.body);
     lastFrameTime = Date.now();
 
     return res.sendStatus(200);
 });
 
-// --- stream MJPEG realtime ---
+// JSON untuk endpoint lainnya
+app.use(express.json({ limit: "1mb" }));
+
+let latestFrame = null;
+let lastFrameTime = Date.now();
+let lastCommand = "stop";
+
+// STREAM MJPEG
 app.get("/stream", (req, res) => {
     res.writeHead(200, {
-        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        "Pragma": "no-cache",
+        "Cache-Control": "no-store",
         "Content-Type": "multipart/x-mixed-replace; boundary=frame"
     });
 
-    const interval = setInterval(() => {
+    const timer = setInterval(() => {
         if (!latestFrame) return;
 
         res.write(`--frame\r\n`);
@@ -42,34 +39,28 @@ app.get("/stream", (req, res) => {
         res.write(`Content-Length: ${latestFrame.length}\r\n\r\n`);
         res.write(latestFrame);
         res.write("\r\n");
-    }, 100); // ~10 FPS realtime
+    }, 120);
 
-    req.on("close", () => clearInterval(interval));
+    req.on("close", () => clearInterval(timer));
 });
 
-// --- read command ---
+// COMMAND GET
 app.get("/command", (req, res) => {
-    res.json({
-        cmd: lastCommand,
-        ts: Date.now()
-    });
+    res.json({ cmd: lastCommand, ts: Date.now() });
 });
 
-// --- set command ---
+// COMMAND POST
 app.post("/cmd", (req, res) => {
-    if (req.body && req.body.cmd) {
+    if (req.body.cmd) {
         lastCommand = req.body.cmd;
-        lastCmdTime = Date.now();
         return res.send("ok");
     }
     res.send("invalid");
 });
 
-// --- ping ---
-app.get("/ping", (req, res) => res.send("pong"));
-
-// --- static ui (frontend) ---
+// UI
 app.use(express.static("public"));
 
+// START
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log("SERVER READY on " + port));
