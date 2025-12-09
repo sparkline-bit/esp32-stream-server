@@ -1,30 +1,27 @@
 const express = require("express");
 const app = express();
 
-// RAW hanya untuk endpoint /frame (lebih aman, tidak makan RAM seluruh server)
+// --- RAW JPEG handler khusus /frame ---
 app.post("/frame", express.raw({
     type: "image/jpeg",
     limit: "2mb"
 }), (req, res) => {
-
-    if (!req.body || req.body.length < 20) {
+    if (!req.body || req.body.length < 10) {
         return res.status(400).send("no raw");
     }
-
     latestFrame = Buffer.from(req.body);
     lastFrameTime = Date.now();
-
-    return res.sendStatus(200);
+    res.sendStatus(200);
 });
 
-// JSON untuk endpoint lainnya
+// --- JSON handler ---
 app.use(express.json({ limit: "1mb" }));
 
 let latestFrame = null;
 let lastFrameTime = Date.now();
 let lastCommand = "stop";
 
-// STREAM MJPEG
+// streaming
 app.get("/stream", (req, res) => {
     res.writeHead(200, {
         "Cache-Control": "no-store",
@@ -39,28 +36,27 @@ app.get("/stream", (req, res) => {
         res.write(`Content-Length: ${latestFrame.length}\r\n\r\n`);
         res.write(latestFrame);
         res.write("\r\n");
-    }, 120);
+    }, 150);
 
     req.on("close", () => clearInterval(timer));
 });
 
-// COMMAND GET
 app.get("/command", (req, res) => {
-    res.json({ cmd: lastCommand, ts: Date.now() });
+    res.json({ cmd: lastCommand });
 });
 
-// COMMAND POST
 app.post("/cmd", (req, res) => {
-    if (req.body.cmd) {
+    if (req.body && req.body.cmd) {
         lastCommand = req.body.cmd;
         return res.send("ok");
     }
     res.send("invalid");
 });
 
-// UI
 app.use(express.static("public"));
 
-// START
+// ---- THIS IS THE MOST IMPORTANT PART ----
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log("SERVER READY on " + port));
+app.listen(port, "0.0.0.0", () =>
+    console.log("SERVER READY on " + port)
+);
