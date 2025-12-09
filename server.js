@@ -1,22 +1,28 @@
 // super low latency esp32 stream server
 const express = require("express");
 const app = express();
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: false, limit: "5mb" }));
 
-let latestFrame = null;      // JPEG buffer
+// IMPORTANT: untuk RAW JPEG dari ESP32
+app.use(express.raw({ type: "image/jpeg", limit: "5mb" }));
+
+// UI & command tetap JSON
+app.use(express.json({ limit: "1mb" }));
+
+let latestFrame = null;      // JPEG buffer (raw)
 let lastFrameTime = Date.now();
+
 let lastCommand = "stop";
 let lastCmdTime = Date.now();
 
-// --- menerima frame dari ESP32 ---
+// --- menerima frame RAW JPEG ---
 app.post("/frame", (req, res) => {
-    if (!req.body || !req.body.data) {
-        return res.status(400).send("no frame");
+    if (!req.body || req.body.length < 10) {
+        return res.status(400).send("no raw");
     }
 
-    latestFrame = Buffer.from(req.body.data, "base64");
+    latestFrame = Buffer.from(req.body); // langsung simpan JPEG
     lastFrameTime = Date.now();
+
     return res.sendStatus(200);
 });
 
@@ -36,12 +42,12 @@ app.get("/stream", (req, res) => {
         res.write(`Content-Length: ${latestFrame.length}\r\n\r\n`);
         res.write(latestFrame);
         res.write("\r\n");
-    }, 120); // ~8 fps display
+    }, 100); // ~10 FPS realtime
 
     req.on("close", () => clearInterval(interval));
 });
 
-// --- handle command ---
+// --- read command ---
 app.get("/command", (req, res) => {
     res.json({
         cmd: lastCommand,
@@ -62,7 +68,7 @@ app.post("/cmd", (req, res) => {
 // --- ping ---
 app.get("/ping", (req, res) => res.send("pong"));
 
-// --- static ui ---
+// --- static ui (frontend) ---
 app.use(express.static("public"));
 
 const port = process.env.PORT || 3000;
